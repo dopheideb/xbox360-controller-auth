@@ -12,7 +12,7 @@ from   typing import Final, Self
 XSM3_KEY_0x1D: Final[bytes] = bytes.fromhex("e3 5b fb 1c cd ad 32 5b   f7 0e 07 fd 62 3d a7 c4")
 ## Xbox 360 keyvault offset: seen 0x138, seen 0x148
 XSM3_KEY_0x1E: Final[bytes] = bytes.fromhex("8f 29 08 38 0b 5b fe 68   7c 26 46 2a 51 f2 bc 19")
-#XSM3_KEY_0x1E: Final[bytes] = bytes.fromhex("8e 28 08 38 0a 5a fe 68 7c 26 46 2a 50 f2 bc 18 8e 28 08 38 0a 5a fe 68")
+
 
 
 XSM3_ROOT_KEY_0x23: Final[bytes] = bytes.fromhex("82 80 78 68 3a 52 3a 98   10 f4 0c 12 70 66 dc ba")
