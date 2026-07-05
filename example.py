@@ -38,8 +38,19 @@ xca.parse_IN_packet(b"\x02\x00")
 xca.parse_IN_packet(b"\x49\x4c\x00\x00\x28\x65\x7a\x87\x4e\x8a\x14\xc1\xa8\x02\x17\x1c\x44\x9b\xac\xaf\xa7\xaf\xd5\x6f\xcd\x1a\x7f\x28\xba\x45\xb4\x00\x61\xa5\xb9\x68\xa5\x1e\x20\x25\x4c\xc8\x97\xfe\xcf\x04")
 xca.parse_OUT_packet(b"\x41\x84\x03\x00\x03\x01\x00\x00")
 
-reply_computed = xca.parse_OUT_packet(b"\x41\x87\x03\x00\x03\x01\x16\x00\x09\x41\x00\x00\x10\x0b\x17\xa6\x82\x07\x87\xee\x8d\xb6\xed\x6a\x1d\xb3\xfd\x01\x37\x8f")
+out_packet = bytes.fromhex("4187030003011600 09410000100b17a6820787ee8db6ed6a1db3fd01378f")
+logger.debug(f"== Handling OUT packet {out_packet.hex(':')}")
+reply_computed = xca.parse_OUT_packet(out_packet)
 reply_expected = bytes.fromhex("494c000010a5df272b0004aac0b05a5d229d7f906e91")
 logger.debug(f"reply_computed={reply_computed.hex(':')}")
-logger.debug(f"reply_expected={reply_computed.hex(':')}")
+logger.debug(f"reply_expected={reply_expected.hex(':')}")
 assert reply_computed == reply_expected
+
+out_packet = bytes.fromhex("4187030003011600 0941000010fc602aae28794567950f8e66ac054721d6")
+logger.debug(f"== Handling OUT packet {out_packet.hex(':')}")
+reply_computed = xca.parse_OUT_packet(out_packet)
+reply_expected = bytes.fromhex("494c000010819ed2809fe8a959b588bca72dcbe1f219")
+logger.debug(f"reply_computed={reply_computed.hex(':')}")
+logger.debug(f"reply_expected={reply_expected.hex(':')}")
+assert reply_computed == reply_expected
+
