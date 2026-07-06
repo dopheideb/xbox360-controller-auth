@@ -1,6 +1,7 @@
 import Cryptodome.Cipher.DES
 import Cryptodome.Cipher.DES3
 import Cryptodome.Hash
+import Cryptodome.Util.strxor
 import logging
 logger = logging.getLogger(__name__)
 import struct
@@ -509,7 +510,11 @@ class Xbox360ControllerAuth:
 		logger.debug(f"ab={ab.hex(':')}")
 
 		result = XeCrypt.ChainAndSumMac(cd, ab, UsbdSecPlainTextData)
-		return XOR(result, ab)
+		return Cryptodome.Util.strxor.strxor(
+			term1=result,
+			term2=ab,
+			output=None
+		)
 
 
 
@@ -574,7 +579,11 @@ class XeCrypt:
 		result = iv
 		for i in range(len(msg) // 8):
 			block = msg[8 * i:8 * (i + 1)]
-			result = XOR(block, result)
+			result = Cryptodome.Util.strxor.strxor(
+				term1=block,
+				term2=result,
+				output=None
+			)
 			result = XeCrypt.ParveEcb(inp=result, key=key)
 		return result
 
@@ -611,11 +620,3 @@ class XeCrypt:
 			out1 += out0
 
 		return struct.pack(">2I", (out0 + ab1) % 0x7FFFFFFF, (out1 + cd1) % 0x7FFFFFFF)
-
-
-
-class XOR:
-	def __new__(cls, arr1: bytes, arr2: bytes) -> bytes:
-		assert len(arr1) == len(arr2)
-		## Just xor elementwise.
-		return bytes(map(lambda elem: elem[0] ^ elem[1], zip(arr1, arr2)))
