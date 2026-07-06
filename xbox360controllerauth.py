@@ -1,5 +1,6 @@
-from   Cryptodome.Cipher import DES, DES3
-from   Cryptodome.Hash import SHA1
+import Cryptodome.Cipher.DES
+import Cryptodome.Cipher.DES3
+import Cryptodome.Hash
 import logging
 logger = logging.getLogger(__name__)
 import struct
@@ -198,9 +199,9 @@ class Xbox360ControllerAuth:
 		assert provided_mac == computed_mac
 
 		## Decrypt the encrypted data.
-		cipher = DES3.new(
+		cipher = Cryptodome.Cipher.DES3.new(
 			key=DES3_KEY_0x1D,
-			mode=DES3.MODE_CBC,
+			mode=Cryptodome.Cipher.DES3.MODE_CBC,
 			iv=bytes(8),		## !Zero IV!
 		)
 		decrypted_host_data = cipher.decrypt(payload[0:0x18])
@@ -252,7 +253,7 @@ class Xbox360ControllerAuth:
 
 		## We need the SHA1 hash, as 8 bytes will be used as 
 		## IV/salt in the next challenge.
-		sha1 = SHA1.new()
+		sha1 = Cryptodome.Hash.SHA1.new()
 		sha1.update(response_payload__before_encrypting)
 		self._challenge_response_sha1 = sha1.digest()
 		logger.debug(f"self._challenge_response_sha1={self._challenge_response_sha1.hex(':')}")
@@ -338,10 +339,10 @@ class Xbox360ControllerAuth:
 		assert provided_mac == computed_mac
 
 		## Decrypt the encrypted data.
-		cipher = DES3.new(
+		cipher = Cryptodome.Cipher.DES3.new(
 			#key=DES3_KEY_0x1D,
 			key=self._random_device_data,
-			mode=DES3.MODE_CBC,
+			mode=Cryptodome.Cipher.DES3.MODE_CBC,
 			iv=bytes(8),
 		)
 		decrypted_host_data = cipher.decrypt(payload[0:0x8])
@@ -397,9 +398,9 @@ class Xbox360ControllerAuth:
 		logger.debug(f"MAC data={data.hex(':')}")
 
 		## Encrypt with DES (not 3DES), use only the last block.
-		des_cipher = DES.new(
+		des_cipher = Cryptodome.Cipher.DES.new(
 			key=key[0:8],
-			mode=DES.MODE_CBC,
+			mode=Cryptodome.Cipher.DES.MODE_CBC,
 			iv=iv,
 		)
 		if iv != bytes(8):
@@ -415,9 +416,9 @@ class Xbox360ControllerAuth:
 		)
 		logger.debug(f"last_encrypted_block_with_msb_flip={last_encrypted_block_with_msb_flip.hex(':')}")
 
-		des3_cipher = DES3.new(
+		des3_cipher = Cryptodome.Cipher.DES3.new(
 			key=key,
-			mode=DES.MODE_ECB,
+			mode=Cryptodome.Cipher.DES.MODE_ECB,
 		)
 		output = des3_cipher.encrypt(last_encrypted_block_with_msb_flip)
 		logger.debug(f"output={output.hex(':')}")
@@ -432,15 +433,15 @@ class Xbox360ControllerAuth:
 		return cksum
 
 	def des3_encrypt(msg: bytes, key: bytes) -> bytes:
-		cipher = DES3.new(
+		cipher = Cryptodome.Cipher.DES3.new(
 			key=key,
-			mode=DES3.MODE_CBC,
+			mode=Cryptodome.Cipher.DES3.MODE_CBC,
 			iv=bytes(8),		## !Zero IV!
 		)
 		return cipher.encrypt(msg)
 
 	def compute_console_keys(self: Self, console_id: bytes) -> None:
-		console_id_hash = SHA1.new()
+		console_id_hash = Cryptodome.Hash.SHA1.new()
 		console_id_hash.update(console_id)
 		console_id_hash = console_id_hash.digest()
 		logger.debug(f"console_id_hash={console_id_hash.hex(':')}")
