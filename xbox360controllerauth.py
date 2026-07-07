@@ -29,41 +29,84 @@ DES3_KEY_0x1E: Final[bytes] = XSM3_KEY_0x1E + XSM3_KEY_0x1E[0:8]
 
 
 
-class Xbox360ControllerAuth:
+class Xbox360Authentication:
 	def __init__(self) -> None:
 		logger.debug(f"DES3_KEY_0x1D={DES3_KEY_0x1D.hex(':')}")
 		logger.debug(f"DES3_KEY_0x1E={DES3_KEY_0x1E.hex(':')}")
+		self.reset()
+
+	def reset(self) -> None:
+		self._static_console_data = None
+		self._random_console_data = None
+
+		self._static_controller_data = None
+		self._random_controller_data = None
+
+
+
+	@property
+	def static_console_data(self) -> None:
+		return self._static_console_data
+
+	@static_console_data.setter
+	def static_console_data(self, data: bytes) -> None:
+		required_len = 16
+		if len(data) != required_len:
+			raise ValueError(f'We need exactly {required_len} bytes, not {len(data)}.')
+		self._static_console_data = data
+
+	@property
+	def random_console_data(self) -> None:
+		return self._random_console_data
+
+	@random_console_data.setter
+	def random_console_data(self, data: bytes) -> None:
+		required_len = 16
+		if len(data) != required_len:
+			raise ValueError(f'We need exactly {required_len} bytes, not {len(data)}.')
+		self._random_console_data = data
+
+
+
+	@property
+	def static_controller_data(self) -> None:
+		return self._static_controller_data
+
+	@static_controller_data.setter
+	def static_controller_data(self, data: bytes) -> None:
+		required_len = 32
+		if len(data) != required_len:
+			raise ValueError(f'We need exactly {required_len} bytes, not {len(data)}.')
+		self._static_controller_data = data
+
+	@property
+	def random_controller_data(self) -> None:
+		return self._random_controller_data
+
+	@random_controller_data.setter
+	def random_controller_data(self, data: bytes) -> None:
+		required_len = 16
+		if len(data) != required_len:
+			raise ValueError(f'We need exactly {required_len} bytes, not {len(data)}.')
+		self._random_controller_data = data
+
+
+
+class Xbox360ConsoleAuth(Xbox360Authentication):
+	def __init__(self, *args, **kwargs) -> None:
+		super().__init__(*args, **kwargs)
+
+
+
+class Xbox360ControllerAuth(Xbox360Authentication):
+	def __init__(self, *args, **kwargs) -> None:
+		super().__init__(*args, **kwargs)
+		#logger.debug(f"DES3_KEY_0x1D={DES3_KEY_0x1D.hex(':')}")
+		#logger.debug(f"DES3_KEY_0x1E={DES3_KEY_0x1E.hex(':')}")
 		self._console_id = None
-		self._random_device_data = None
-		self._static_device_data = None
 		self._xsm3_kv_2des_key_1 = None
 		self._xsm3_kv_2des_key_2 = None
 		pass
-
-
-
-	@property
-	def random_device_data(self) -> None:
-		return self._random_device_data
-
-	@random_device_data.setter
-	def random_device_data(self, data: bytes) -> None:
-		if len(data) != 16:
-			raise ValueError('We need exactly 16 bytes.')
-		self._random_device_data = data
-
-
-
-	@property
-	def static_device_data(self) -> None:
-		return self._static_device_data
-
-	@static_device_data.setter
-	def static_device_data(self, data: bytes) -> None:
-		if len(data) != 32:
-			raise ValueError(f"We need exactly 32 bytes, not {len(data)}.")
-		self._static_device_data = data
-		logger.debug(f"static_device_data={self.static_device_data.hex(':')}")
 
 
 
@@ -96,7 +139,7 @@ class Xbox360ControllerAuth:
 			static_data[0x14           ] = payload[0x13           ]
 			static_data[0x15           ] = payload[0x16           ]
 			static_data[0x16:0x16 + 0x2] = payload[0x14:0x14 + 0x2]
-			self.static_device_data = static_data
+			self.static_controller_data = static_data
 			return
 
 		if len(packet) == 0x2E:
@@ -168,7 +211,10 @@ class Xbox360ControllerAuth:
 		header = data[0:5]
 		payload = data[5:]
 
-		## Split the payload.
+		## Split the payload:
+		##   - header (first 5 bytes)
+		##   - payload (all remaining bytes)
+		##   - checksum (last byte)
 		encrypted_data = payload[0:-5]
 		logger.debug(f"encrypted_data={encrypted_data.hex(':')}")
 
@@ -183,6 +229,11 @@ class Xbox360ControllerAuth:
 		## Verify the checksum.
 		computed_checksum = Xbox360ControllerAuth.checksum(data)
 		logger.debug(f"computed_checksum={computed_checksum:02x}")
+
+		if computed_checksum != provided_checksum:
+			logger.error(f"Provided checksum ({provided_checksum:#04x}) and computed checksum ({computed_checksum:#04x}) differ!")
+		else:
+			logger.debug(f"Provided checksum ({provided_checksum:#04x}) and computed checksum ({computed_checksum:#04x}) match!")
 		assert provided_checksum == computed_checksum
 
 		## Only the last 4 bytes of the MAC are actually used. 
@@ -208,18 +259,16 @@ class Xbox360ControllerAuth:
 		decrypted_host_data = cipher.decrypt(payload[0:0x18])
 		logger.debug(f"decrypted_host_data={decrypted_host_data.hex(':')}")
 
-		self._random_host_data = decrypted_host_data[0:0x10]
-		logger.debug(f"self._random_host_data={self._random_host_data.hex(':')}")
+		self.random_console_data = decrypted_host_data[0:0x10]
+		logger.debug(f"self.random_console_data={self.random_console_data.hex(':')}")
 
-		random_host_data__swapped = self._random_host_data[8:] + self._random_host_data[0:8]
+		random_host_data__swapped = self.random_console_data[8:] + self.random_console_data[0:8]
 		logger.debug(f"random_host_data__swapped={random_host_data__swapped.hex(':')}")
 
 		self._verify_salt = (
-			self.random_device_data[12:12+4]
+			self.random_controller_data[12:12+4]
 			+
-			self._random_host_data[12:12+4]
-			#+
-			#self._random_host_data[8:8+8]
+			self.random_console_data[12:12+4]
 		)
 		logger.debug(f"self._verify_salt={self._verify_salt.hex(':')}")
 
@@ -234,7 +283,7 @@ class Xbox360ControllerAuth:
 
 		logger.debug("Encrypting data from host, to prove we have root key 35 (XSM3_ROOT_KEY_0x23).")
 		self._proof_0x23 = Xbox360ControllerAuth.des3_encrypt(
-			msg=self._random_host_data,
+			msg=self._random_console_data,
 			key=self._xsm3_kv_2des_key_1,
 		)
 		logger.debug(f"self._proof_0x23={self._proof_0x23.hex(':')}")
@@ -247,9 +296,13 @@ class Xbox360ControllerAuth:
 		logger.debug(f"self._proof_0x24={self._proof_0x24.hex(':')}")
 
 		logger.debug(f"The unencrypted response payload consists of:")
-		logger.debug(f"  The random data from the device: {self.random_device_data.hex(':')}")
-		logger.debug(f"  The random data from the host:   {self._random_host_data.hex(':')}")
-		response_payload__before_encrypting = self.random_device_data + self._random_host_data
+		logger.debug(f"  The random data from the controller: {self.random_controller_data.hex(':')}")
+		logger.debug(f"  The random data from the console:    {self.random_console_data.hex(':')}")
+		response_payload__before_encrypting = (
+			self.random_controller_data
+			+
+			self.random_console_data
+		)
 		logger.debug(f"response_payload__before_encrypting={response_payload__before_encrypting.hex(':')}")
 
 		## We need the SHA1 hash, as 8 bytes will be used as 
@@ -276,7 +329,7 @@ class Xbox360ControllerAuth:
 
 		acr = self.ACR(
 			key=response_payload__after_encrypting__mac,
-			input=self._static_device_data,
+			input=self.static_controller_data,
 		)
 		logger.debug(f"acr={acr.hex(':')}")
 
@@ -342,7 +395,7 @@ class Xbox360ControllerAuth:
 		## Decrypt the encrypted data.
 		cipher = Cryptodome.Cipher.DES3.new(
 			#key=DES3_KEY_0x1D,
-			key=self._random_device_data,
+			key=self._random_controller_data,
 			mode=Cryptodome.Cipher.DES3.MODE_CBC,
 			iv=bytes(8),
 		)
@@ -351,7 +404,7 @@ class Xbox360ControllerAuth:
 
 		acr = self.ACR(
 			key=decrypted_host_data,
-			input=self._static_device_data,
+			input=self._static_controller_data,
 		)
 		logger.debug(f"acr={acr.hex(':')}")
 		response_payload__before_encrypting = acr
