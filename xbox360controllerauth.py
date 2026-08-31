@@ -45,22 +45,23 @@ class Xbox360Authentication:
 
 
 	@property
-	def static_console_data(self) -> None:
+	def static_console_data(self) -> bytes:
 		return self._static_console_data
 
 	@static_console_data.setter
 	def static_console_data(self, data: bytes) -> None:
-		required_len = 16
+		required_len = 8
 		if len(data) != required_len:
 			raise ValueError(f'We need exactly {required_len} bytes, not {len(data)}.')
 		self._static_console_data = data
 
 	@property
-	def random_console_data(self) -> None:
+	def random_console_data(self) -> bytes:
 		return self._random_console_data
 
 	@random_console_data.setter
 	def random_console_data(self, data: bytes) -> None:
+		logger.debug(f"data={data.hex(':')}")
 		required_len = 16
 		if len(data) != required_len:
 			raise ValueError(f'We need exactly {required_len} bytes, not {len(data)}.')
@@ -69,18 +70,18 @@ class Xbox360Authentication:
 
 
 	@property
-	def static_controller_data(self) -> None:
+	def static_controller_data(self) -> bytes:
 		return self._static_controller_data
 
 	@static_controller_data.setter
 	def static_controller_data(self, data: bytes) -> None:
-		required_len = 32
+		required_len = 24
 		if len(data) != required_len:
 			raise ValueError(f'We need exactly {required_len} bytes, not {len(data)}.')
 		self._static_controller_data = data
 
 	@property
-	def random_controller_data(self) -> None:
+	def random_controller_data(self) -> bytes:
 		return self._random_controller_data
 
 	@random_controller_data.setter
@@ -96,11 +97,100 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 	def __init__(self, *args, **kwargs) -> None:
 		super().__init__(*args, **kwargs)
 
+	def UsbdSecXSM3GetIdentificationProtocolData(self) -> bytes:
+		setup_data = bytes([
+			0xc1,			## bmRequestType (OUT, vendor, interface)
+			0x81,			## bRequest
+			0x17, 0x5b,		## wValue (0x5b17)
+			0x03, 0x01,		## wIndex (0x0103)
+			0x1d, 0x00,		## wLength (0x001d)
+		])
+		assert len(setup_data) == 8
+		logger.debug(f"setup_data={setup_data.hex(':')}")
+
+		return setup_data
+
+
+
+	def UsbdSecXSM3SetChallengeProtocolData(self) -> bytes:
+		setup_data = bytes([
+			0x41,			## bmRequestType (OUT, vendor, interface)
+			0x82,			## bRequest
+			0x03, 0x00,		## wValue (0x0003)
+			0x03, 0x01,		## wIndex (0x0103)
+			0x22, 0x00,		## wLength (0x0022)
+		])
+		assert len(setup_data) == 8
+
+		payload_header = bytes([
+			0x09,
+			0x40,
+			0x00,
+			0x00,
+			0x1c,
+		])
+
+		payload_unencrypted = (
+			self.random_console_data
+			+
+			self.static_console_data
+		)
+
+		## Encrypt the payload.
+		cipher = Cryptodome.Cipher.DES3.new(
+			key=DES3_KEY_0x1D,
+			mode=Cryptodome.Cipher.DES3.MODE_CBC,
+			iv=bytes(8),		## !Zero IV!
+		)
+		payload_encrypted = cipher.encrypt(payload_unencrypted)
+		logger.debug(f"payload_encrypted={payload_encrypted.hex(':')}")
+
+		payload_MAC = Xbox360ControllerAuth.MAC(
+			data=payload_encrypted,
+			key=DES3_KEY_0x1E,
+			iv=bytes(8),
+		)
+
+		payload_checksum = bytes([Xbox360ControllerAuth.checksum(
+			payload_encrypted
+			+
+			payload_MAC[4:8]
+		)])
+
+		packet = (
+			setup_data
+			+
+			payload_header
+			+
+			payload_encrypted
+			+
+			payload_MAC[4:8]
+			+
+			payload_checksum
+		)
+
+		return packet
+
+
+
+	def UsbdSecXSM3GetStatus(self) -> bytes:
+		setup_data = bytes([
+			0xc1,			## bmRequestType (OUT, vendor, interface)
+			0x86,			## bRequest
+			0x00, 0x00,		## wValue (0x0000)
+			0x03, 0x01,		## wIndex (0x0103)
+			0x02, 0x00,		## wLength (0x0002)
+		])
+		assert len(setup_data) == 8
+		logger.debug(f"setup_data={setup_data.hex(':')}")
+
+		return setup_data
 
 
 class Xbox360ControllerAuth(Xbox360Authentication):
 	def __init__(self, *args, **kwargs) -> None:
 		super().__init__(*args, **kwargs)
+		self.is_ready = False
 		#logger.debug(f"DES3_KEY_0x1D={DES3_KEY_0x1D.hex(':')}")
 		#logger.debug(f"DES3_KEY_0x1E={DES3_KEY_0x1E.hex(':')}")
 		self._console_id = None
@@ -110,7 +200,87 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 
+	def parse_control_transfer(self, data: bytes) -> bytes:
+		logger.debug(f"Parsing control transfer={data.hex(':')}")
+
+		setup_data = data[0:8]
+		out_data = data[8:]
+
+		bmRequestType = setup_data[0]
+		bRequest = setup_data[1]
+		wValue   = struct.unpack('<H', setup_data[2:4])[0]
+		wIndex   = struct.unpack('<H', setup_data[4:6])[0]
+		wLength  = struct.unpack('<H', setup_data[6:8])[0]
+
+		direction = (bmRequestType & 0b10000000) >> 7
+		type      = (bmRequestType & 0b01100000) >> 5
+		recipient = (bmRequestType & 0b00011111) >> 0
+
+		logger.debug(f"bmRequestType={bmRequestType:#010b}")
+		logger.debug(f"  direction={direction}")
+		logger.debug(f"  type={type}")
+		logger.debug(f"  recipient={recipient}")
+		logger.debug(f"bRequest={bRequest:02x}")
+		logger.debug(f"wValue={wValue:02x}")
+		logger.debug(f"wIndex={wIndex:02x}")
+		logger.debug(f"wLength={wLength:02x}")
+
+		if type != 0b10:
+			raise ValueError("Expected a VENDOR control transfer.")
+
+		if recipient != 0b00001:
+			raise ValueError("Expected an INTERFACE control transfer.")
+
+		if (
+				direction == 1		## IN (host to device)
+				and
+				bRequest == 0x81	## 129
+				and
+				wValue == 0x5b17
+				and
+				wIndex == 0x0103
+				and
+				wLength == 0x001d	## 29
+		):
+			return self.UsbdSecXSM3GetIdentificationProtocolData(
+				setup=setup_data,
+			)
+
+		if (
+				direction == 0		## OUT (device to host)
+				and
+				bRequest == 0x82
+				and
+				wValue == 0x0003
+				and
+				wIndex == 0x0103
+				and
+				wLength == 0x0022
+		):
+			return self.UsbdSecXSM3SetChallengeProtocolData(
+				setup=setup_data,
+				data=out_data,
+			)
+
+		if (
+				direction == 1		## IN (host to device)
+				and
+				bRequest == 0x86	## 134
+				and
+				wValue == 0x0000
+				and
+				wIndex == 0x0103
+				and
+				wLength == 0x0002
+		):
+			return self.UsbdSecXSM3GetStatus(
+				setup=setup_data,
+			)
+
+		raise ValueError(f"Unknown control transfer {data.hex(':')}")
+
 	def parse_IN_packet(self, packet: bytes) -> None:
+		logger.debug(f"packet={packet.hex(':')}")
 		if len(packet) == 0x02:
 			if packet == b"\x01\x00":
 				logger.debug("Peripheral device is not ready.")
@@ -130,7 +300,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			##   wValue		0x5b17 (0x17 == 0x1d - 5 - 1)
 			##   wIndex		0x0103 (259)
 			##   wLength		0x001d (29)
-			static_data = bytearray(0x20)
+			static_data = bytearray(0x18)
 			payload = packet[5:]
 			static_data[0x00:0x00 + 0xf] = payload[0x00:0x00 + 0xf]
 			static_data[0x0f           ] = 0
@@ -140,6 +310,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			static_data[0x15           ] = payload[0x16           ]
 			static_data[0x16:0x16 + 0x2] = payload[0x14:0x14 + 0x2]
 			self.static_controller_data = static_data
+			logger.debug(f"self.static_controller_data={self.static_controller_data.hex(':')}")
 			return
 
 		if len(packet) == 0x2E:
@@ -154,7 +325,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			return
 
 
-		raise ValueError(f"Unknown IN packet {packet}.")
+		raise ValueError(f"Unknown IN packet {packet.hex(':')}.")
 
 	def parse_OUT_packet(self, packet: bytes) -> bytes:
 		if (
@@ -207,6 +378,100 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 
+	def UsbdSecXSM3GetIdentificationProtocolData(self: Self, setup: bytes) -> bytes:
+		header = bytes([
+			0x49,	## ?Magic constant?
+			0x4b,
+			0x00,
+			0x00,
+			0x17,	## Length of payload (23), does not include checksum byte.
+		])
+		payload = (
+			self.static_controller_data[0x00:0x17]
+		)
+		checksum = Xbox360ControllerAuth.checksum(payload)
+
+		reply_packet = header + payload + bytes([checksum])
+		return reply_packet
+
+
+
+	def UsbdSecXSM3SetChallengeProtocolData(self, setup: bytes, data: bytes) -> None:
+		header = data[0:5]
+		payload = data[5:]
+
+		logger.debug(f"header={header.hex(':')}")
+		logger.debug(f"payload={payload.hex(':')}")
+		assert header == bytes([
+			0x09,
+			0x40,
+			0x00,
+			0x00,
+			0x1c,
+		])
+
+		## Split the payload:
+		##   - header (first 5 bytes)
+		##   - payload (all remaining bytes)
+		##   - checksum (last byte)
+		encrypted_data = payload[0:-5]
+		logger.debug(f"encrypted_data={encrypted_data.hex(':')}")
+
+		provided_mac = payload[-5:-1]
+		logger.debug(f"provided_mac={provided_mac.hex(':')}")
+
+		provided_checksum = payload[-1]
+		logger.debug(f"provided_checksum={provided_checksum:02x}")
+
+		## Verify the checksum.
+		computed_checksum = Xbox360ControllerAuth.checksum(data[5:-1])
+		logger.debug(f"computed_checksum={computed_checksum:02x}")
+
+		if computed_checksum != provided_checksum:
+			logger.error(f"Provided checksum ({provided_checksum:#04x}) and computed checksum ({computed_checksum:#04x}) differ!")
+		else:
+			logger.debug(f"Provided checksum ({provided_checksum:#04x}) and computed checksum ({computed_checksum:#04x}) match!")
+		assert provided_checksum == computed_checksum
+
+		## Only the last 4 bytes of the MAC are actually used. 
+		## (The provided MAC is also only 4 bytes.)
+		computed_mac = Xbox360ControllerAuth.MAC(
+			data=encrypted_data,
+			key=DES3_KEY_0x1E,
+			iv=bytes(8),
+		)[4:8]
+		## Verify MAC.
+		if provided_mac != computed_mac:
+			logger.error(f"Provided MAC ({provided_mac.hex(':')}) and computed MAC ({computed_mac.hex(':')}) differ!")
+		else:
+			logger.debug(f"Provided MAC ({provided_mac.hex(':')}) and computed MAC ({computed_mac.hex(':')}) match.")
+		assert provided_mac == computed_mac
+
+		## Decrypt the encrypted data.
+		cipher = Cryptodome.Cipher.DES3.new(
+			key=DES3_KEY_0x1D,
+			mode=Cryptodome.Cipher.DES3.MODE_CBC,
+			iv=bytes(8),		## !Zero IV!
+		)
+		decrypted_host_data = cipher.decrypt(payload[0:0x18])
+		logger.debug(f"decrypted_host_data={decrypted_host_data.hex(':')}")
+
+		self.random_console_data = decrypted_host_data[0:0x10]
+		logger.debug(f"self.random_console_data={self.random_console_data.hex(':')}")
+
+		self.static_console_data = decrypted_host_data[0x10:0x10 + 8]
+		logger.debug(f"self.static_console_data={self.static_console_data.hex(':')}")
+
+
+	def UsbdSecXSM3GetStatus(self: Self, setup: bytes) -> bytes:
+		if self.is_ready:
+			return b"\x02\00"
+
+		self.is_ready = True
+		return b"\x01\x00"
+
+
+
 	def parse_challenge_data1(self: Self, data: bytes) -> None:
 		header = data[0:5]
 		payload = data[5:]
@@ -227,7 +492,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 		## Verify the checksum.
-		computed_checksum = Xbox360ControllerAuth.checksum(data)
+		computed_checksum = Xbox360ControllerAuth.checksum(data[5:-1])
 		logger.debug(f"computed_checksum={computed_checksum:02x}")
 
 		if computed_checksum != provided_checksum:
@@ -343,13 +608,14 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		xsm3_challenge_response[5 + 0x20:5 + 0x20 + 0x8] = acr
 
 		logger.debug("Challenge response assembled. Computing and storing checksum.")
-		cksum = Xbox360ControllerAuth.checksum(xsm3_challenge_response)
-		logger.debug(f"cksum={cksum:02x}")
+		checksum = Xbox360ControllerAuth.checksum(xsm3_challenge_response[5:-1])
+		logger.debug(f"checksum={checksum:02x}")
 
-		xsm3_challenge_response[-1] = cksum
+		xsm3_challenge_response[-1] = checksum
 		logger.debug(f"xsm3_challenge_response={xsm3_challenge_response.hex(':')}")
 
 		return xsm3_challenge_response
+
 
 
 	def parse_challenge_data2(self: Self, data: bytes) -> None:
@@ -372,7 +638,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 		## Verify the checksum.
-		computed_checksum = Xbox360ControllerAuth.checksum(data)
+		computed_checksum = Xbox360ControllerAuth.checksum(data[5:-1])
 		logger.debug(f"computed_checksum={computed_checksum:02x}")
 		assert provided_checksum == computed_checksum
 
@@ -436,10 +702,10 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		xsm3_challenge_response[5+8:5+8+8] = response_payload__after_encrypting__mac
 
 		logger.debug("Challenge response assembled. Computing and storing checksum.")
-		cksum = Xbox360ControllerAuth.checksum(xsm3_challenge_response)
-		logger.debug(f"cksum={cksum:02x}")
+		checksum = Xbox360ControllerAuth.checksum(xsm3_challenge_response[5:-1])
+		logger.debug(f"checksum={checksum:02x}")
 
-		xsm3_challenge_response[-1] = cksum
+		xsm3_challenge_response[-1] = checksum
 		logger.debug(f"xsm3_challenge_response={xsm3_challenge_response.hex(':')}")
 
 		return xsm3_challenge_response
@@ -480,10 +746,12 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 
-	def checksum(packet: bytes) -> bytes:
+	def checksum(data: bytes) -> bytes:
+		logger.debug(f"Calculating checksum over {data.hex(':')}.")
 		cksum = 0
-		for b in packet[5:-1]:
-			cksum ^= b
+		for byte in data:
+			cksum ^= byte
+		logger.debug(f"Checksum over {data.hex(':')} is {cksum:#04x}.")
 		return cksum
 
 	def des3_encrypt(msg: bytes, key: bytes) -> bytes:
