@@ -4,7 +4,9 @@ The LEGO Dimensions Toypad is said to use different keys than the 0x1D
 and 0x1E keys. Using a man in the middle (GIMX on Arduino Leonardo), we 
 sniffed the traffic, and recorded it.
 
+# Labels
 
+The labels we use, come from https://oct0xor.github.io/2017/05/03/xsm3/
 
 # UsbdSecXSM3GetIdentificationProtocolData
 
