@@ -49,15 +49,17 @@ Toypad's response the first time:
 ```
 01 00
 ```
+This means: "I'm not yet ready for responding to your challenge."
 
 Toypad's response the second time:
 ```
 02 00
 ```
+This means: "I'm ready for responding to your challenge."
 
 
 
-# ???
+# UsbdSecXSM3GetResponseVerifyProtocolData1
 
 Host's IN control transfer:
 ```
@@ -83,7 +85,7 @@ Toypad's response: (zero data)
 
 
 
-# ?Challenge 2?
+# UsbdSecXSM3SetVerifyProtocolData2
 
 Host's OUT control transfer:
 ```
@@ -116,7 +118,7 @@ Toypad's response the second time:
 
 
 
-# ???
+# UsbdSecXSM3GetResponseVerifyProtocolData2
 
 Host's IN control transfer:
 ```
@@ -132,12 +134,15 @@ e0 3f 9f 9d da d5
 
 
 
-# ???
+# UsbdSecXSM3SetVerifyProtocolData3???
 
 Host's OUT control transfer:
 ```
 41 87 03 00 03 01 16 00
 
+
+09 41 00 00 10 3e 60 c2   13 bb 02 d8 6c d2 02 86
+91 aa 3d 8d 8c d3
 ```
 
 Toypad's response: (zero data)
@@ -163,7 +168,7 @@ Toypad's response the second time:
 
 
 
-# ???
+# UsbdSecXSM3GetResponseVerifyProtocolData3???
 
 Host's IN control transfer:
 ```
