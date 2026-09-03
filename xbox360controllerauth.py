@@ -8,17 +8,28 @@ import struct
 from   typing import Final, Self, List
 
 
-## Both keys are in both the Xbox 360 and the controller.
+## Both keys (0x1D and 0x1E) are present in every Xbox 360's keyvault.
 ##
 ## Xbox 360 keyvault offset: seen 0x128, seen 0x138
 XSM3_KEY_0x1D: Final[bytes] = bytes.fromhex("e3 5b fb 1c cd ad 32 5b   f7 0e 07 fd 62 3d a7 c4")
 ## Xbox 360 keyvault offset: seen 0x138, seen 0x148
 XSM3_KEY_0x1E: Final[bytes] = bytes.fromhex("8f 29 08 38 0b 5b fe 68   7c 26 46 2a 51 f2 bc 19")
 
+## Global device keys from devkit keyvaults, from https://github.com/InvoxiPlayGames/libxsm3/blob/master/xsm3.c
+#XSM3_KEY_0x1D: Final[bytes] = bytes.fromhex("C2 15 E5 5E E5 51 94 2A   EC 3D 45 EC B6 E6 F2 16")
+#XSM3_KEY_0x1E: Final[bytes] = bytes.fromhex("C7 45 AD 1F 08 0B D9 E9   9B 1C 34 E3 A4 6D C8 C4")
 
 
+
+## Retail keys for generating 0x23/0x24 keys from console ID, from 
+## https://github.com/InvoxiPlayGames/libxsm3/blob/master/xsm3.c
 XSM3_ROOT_KEY_0x23: Final[bytes] = bytes.fromhex("82 80 78 68 3a 52 3a 98   10 f4 0c 12 70 66 dc ba")
 XSM3_ROOT_KEY_0x24: Final[bytes] = bytes.fromhex("66 62 1a 78 f8 60 9c 8a   26 9a 04 ae d8 5c 1e c8")
+
+## devkit recovery keys for generating 0x23/0x24 keys from console ID, 
+## from https://github.com/InvoxiPlayGames/libxsm3/blob/master/xsm3.c
+#XSM3_ROOT_KEY_0x23: Final[bytes] = bytes.fromhex("b9 e0 9e 68 04 83 91 b3   32 45 7a da 43 6b 80 ad")
+#XSM3_ROOT_KEY_0x24: Final[bytes] = bytes.fromhex("92 5d 29 6e b0 61 0b f1   d6 29 3b c8 c7 d9 32 bc")
 
 
 
