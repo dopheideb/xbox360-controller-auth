@@ -417,7 +417,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 				and
 				wLength == 0x0022
 		):
-			return self.UsbdSecXSM3SetChallengeProtocolData1(
+			return self.UsbdSecXSM3SetChallengeProtocolData(
 				setup=setup_data,
 				data=out_data,
 			)
@@ -533,7 +533,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 
-	def UsbdSecXSM3SetChallengeProtocolData1(
+	def UsbdSecXSM3SetChallengeProtocolData(
 			self: Self,
 			setup: bytes,
 			data: bytes,
@@ -742,7 +742,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		MAC, and stores the decrypted data internally.
 
 		This member is closely related to 
-		UsbdSecXSM3SetChallengeProtocolData1() in which 
+		UsbdSecXSM3SetChallengeProtocolData() in which 
 		calculations are made, yet differ in terms like 3DES key.
 		"""
 		self.is_ready = False
