@@ -5,7 +5,7 @@ import Cryptodome.Util.strxor
 import logging
 logger = logging.getLogger(__name__)
 import struct
-from   typing import Final, Self, List
+from   typing import Final, Self, cast
 
 
 ## Both keys (0x1D and 0x1E) are present in every Xbox 360's keyvault.
@@ -47,17 +47,19 @@ class Xbox360Authentication:
 		self.reset()
 
 	def reset(self: Self) -> None:
-		self._static_console_data = None
-		self._random_console_data = None
+		self._static_console_data: bytes|None = None
+		self._random_console_data: bytes|None = None
 
-		self._static_controller_data = None
-		self._random_controller_data = None
+		self._static_controller_data: bytes|None = None
+		self._random_controller_data: bytes|None = None
 
-		self._xsm3_kv_2des_key = [None, None]
+		self._xsm3_kv_2des_key: tuple[bytes, bytes]|None = None
 
 
 	@property
 	def static_console_data(self: Self) -> bytes:
+		if self._static_console_data is None:
+			raise RuntimeError("static_console_data has not been initialized.")
 		return self._static_console_data
 
 	@static_console_data.setter
@@ -85,7 +87,9 @@ class Xbox360Authentication:
 			iv=bytes(8),
 		)
 
-		self._xsm3_kv_2des_key = [ key0, key1 ]
+		key_pair: tuple[bytes, bytes] = (key0, key1)
+		self._xsm3_kv_2des_key = key_pair
+
 		logger.debug(f"self._xsm3_kv_2des_key[0]={self._xsm3_kv_2des_key[0].hex(':')}")
 		logger.debug(f"self._xsm3_kv_2des_key[1]={self._xsm3_kv_2des_key[1].hex(':')}")
 
@@ -93,6 +97,8 @@ class Xbox360Authentication:
 
 	@property
 	def random_console_data(self: Self) -> bytes:
+		if self._random_console_data is None:
+			raise RuntimeError("random_console_data has not been initialized.")
 		return self._random_console_data
 
 	@random_console_data.setter
@@ -109,6 +115,8 @@ class Xbox360Authentication:
 
 	@property
 	def static_controller_data(self: Self) -> bytes:
+		if self._static_controller_data is None:
+			raise RuntimeError("static_controller_data has not been initialized.")
 		return self._static_controller_data
 
 	@static_controller_data.setter
@@ -122,6 +130,8 @@ class Xbox360Authentication:
 
 	@property
 	def random_controller_data(self: Self) -> bytes:
+		if self._random_controller_data is None:
+			raise RuntimeError("random_controller_data has not been initialized.")
 		return self._random_controller_data
 
 	@random_controller_data.setter
@@ -136,7 +146,9 @@ class Xbox360Authentication:
 
 
 	@property
-	def console_encryption_keys(self: Self) -> List[bytes]:
+	def console_encryption_keys(self: Self) -> tuple[bytes, bytes]:
+		if self._xsm3_kv_2des_key is None:
+			raise RuntimeError("console_encryption_keys has not been initialized.")
 		return self._xsm3_kv_2des_key
 
 
@@ -319,7 +331,7 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 		logger.debug(f"random_controller_data={random_controller_data.hex(':')}")
 		logger.debug(f"random_console_data={random_console_data.hex(':')}")
 
-		if self.random_controller_data is None:
+		if self._random_controller_data is None:
 			self.random_controller_data = random_controller_data
 		else:
 			assert self.random_controller_data == random_controller_data
@@ -889,7 +901,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 
-	def checksum(data: bytes) -> bytes:
+	def checksum(data: bytes) -> int:
 		logger.debug(f"Calculating checksum over {data.hex(':')}.")
 		cksum = 0
 		for byte in data:
@@ -977,7 +989,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		ab = XeCrypt.ParveCbcMac(
 			msg=UsbdSecPlainTextData,
 			key=key,
-			iv=iv
+			iv=iv,
 		)
 		logger.debug(f"ab={ab.hex(':')}")
 
