@@ -707,19 +707,18 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		logger.debug(f"acr={acr.hex(':')}")
 
 		## Time to create the response.
-		xsm3_challenge_response = bytearray(0x2e)
-		xsm3_challenge_response[0] = 0x49	## Packet magic
-		xsm3_challenge_response[1] = 0x4c
-		xsm3_challenge_response[4] = 0x28	## Packet length, 0x28 == 40
-
-		xsm3_challenge_response[5       :5 + 0x20      ] = response_payload__after_encrypting
-		xsm3_challenge_response[5 + 0x20:5 + 0x20 + 0x8] = acr
-
-		logger.debug("Challenge response assembled. Computing and storing checksum.")
-		checksum = Xbox360ControllerAuth.checksum(xsm3_challenge_response[5:-1])
+		header = bytes([
+			0x49,		## Magic.
+			0x4c,		##
+			0x00,
+			0x00,
+			0x28,		## Payload length, 0x28 == 40. It does not include the checksum.
+		])
+		payload = response_payload__after_encrypting + acr
+		checksum = Xbox360ControllerAuth.checksum(payload)
 		logger.debug(f"checksum={checksum:02x}")
 
-		xsm3_challenge_response[-1] = checksum
+		xsm3_challenge_response = header + payload + bytes([checksum])
 		logger.debug(f"xsm3_challenge_response={xsm3_challenge_response.hex(':')}")
 
 		return xsm3_challenge_response
