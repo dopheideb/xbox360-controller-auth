@@ -71,9 +71,13 @@ class Xbox360Authentication:
 		logger.debug(f"Setting static_console_data to {data.hex(':')}.")
 		self._static_console_data = data
 
+		## The device and the host use encryption based on the 
+		## statis console data. Since that data is now known, 
+		## the device can calculate the keys.
+		## 
 		## (Re)computed the console keys.
 		hash = Cryptodome.Hash.SHA1.new()
-		hash.update(data)
+		hash.update(self._static_console_data)
 		digest = hash.digest()
 
 		key0 = Xbox360ControllerAuth.des3_encrypt(
@@ -946,7 +950,6 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 	def ACR(self: Self, input: bytes, key: bytes) -> bytes:
 		logger.debug("ACR called.")
 
-		console_id = self._console_id
 		logger.debug(f"self.static_console_data={self.static_console_data.hex(':')}")
 		logger.debug(f"input={input.hex(':')}")
 		logger.debug(f"key={key.hex(':')}")
