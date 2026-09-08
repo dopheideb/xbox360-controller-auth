@@ -180,6 +180,8 @@ The device start computing the response.
 
 The Xbox 360 queries the progress with this IN packet:
 ```
+c1 86 00 00 03 01 02 00
+
 Setup Data
     bmRequestType: 0xc1
         1... .... = Direction: Device-to-host
