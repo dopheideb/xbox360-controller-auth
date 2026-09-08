@@ -33,8 +33,8 @@ XSM3_ROOT_KEY_0x24: Final[bytes] = bytes.fromhex("66 62 1a 78 f8 60 9c 8a   26 9
 
 
 
-## The 3DES key is actually a 2DES key: s[0] == s[2]; first and last key 
-## are equal.
+## The 3DES key is actually a two-key 3DES key: s[0] == s[2]; first and 
+## last key are equal.
 DES3_KEY_0x1D: Final[bytes] = XSM3_KEY_0x1D + XSM3_KEY_0x1D[0:8]
 DES3_KEY_0x1E: Final[bytes] = XSM3_KEY_0x1E + XSM3_KEY_0x1E[0:8]
 
@@ -72,30 +72,11 @@ class Xbox360Authentication:
 		self._static_console_data = data
 
 		## The device and the host use encryption based on the 
-		## statis console data. Since that data is now known, 
+		## static console data. Since that data is now known, 
 		## the device can calculate the keys.
-		## 
-		## (Re)computed the console keys.
-		hash = Cryptodome.Hash.SHA1.new()
-		hash.update(self._static_console_data)
-		digest = hash.digest()
-
-		key0 = Xbox360ControllerAuth.des3_encrypt(
-			msg=digest[0:0x10],
-			key=XSM3_ROOT_KEY_0x23,
-			iv=bytes(8),
+		self.initialize_console_encryption_keys(
+			self.static_console_data
 		)
-		key1 = Xbox360ControllerAuth.des3_encrypt(
-			msg=digest[4:4+0x10],
-			key=XSM3_ROOT_KEY_0x24,
-			iv=bytes(8),
-		)
-
-		key_pair: tuple[bytes, bytes] = (key0, key1)
-		self._xsm3_kv_2des_key = key_pair
-
-		logger.debug(f"self._xsm3_kv_2des_key[0]={self._xsm3_kv_2des_key[0].hex(':')}")
-		logger.debug(f"self._xsm3_kv_2des_key[1]={self._xsm3_kv_2des_key[1].hex(':')}")
 
 
 
@@ -154,6 +135,56 @@ class Xbox360Authentication:
 		if self._xsm3_kv_2des_key is None:
 			raise RuntimeError("console_encryption_keys has not been initialized.")
 		return self._xsm3_kv_2des_key
+
+	def initialize_console_encryption_keys(
+			self: Self,
+			static_console_data: bytes,
+	) -> None:
+		""" Initialize the console specific encryption keys.
+
+		Part of the communication between console and device is 
+		encrypted with 2 two-key 3DES keys based on the 
+		console's static data. This method computes those 2 3DES 
+		keys.
+		"""
+		self._xsm3_kv_2des_key = Xbox360Authentication._derive_console_encryption_keys(
+			static_console_data,
+		)
+		logger.debug(f"self._xsm3_kv_2des_key[0]={self._xsm3_kv_2des_key[0].hex(':')}")
+		logger.debug(f"self._xsm3_kv_2des_key[1]={self._xsm3_kv_2des_key[1].hex(':')}")
+		return None
+
+	@staticmethod
+	def _derive_console_encryption_keys(
+			static_console_data: bytes,
+	) -> tuple[bytes, bytes]:
+		## SHA1 is used to transform the static console data 
+		## into 20 bytes of (sortof) random bytes.
+		sha1 = Cryptodome.Hash.SHA1.new()
+		sha1.update(static_console_data)
+		static_console_data_sha1_digest = sha1.digest()
+		logger.debug(f"static_console_data_sha1_digest={static_console_data_sha1_digest.hex(':')}")
+
+		## Note: a SHA1 digest is 160 bit, i.e. 20 bytes. First 
+		## 16 bytes are used for the first key, last 16 bytes 
+		## are used for the second key. Hence, the messages that 
+		## will be encrypted, have 12 bytes in common.
+		console_key0 = Xbox360ControllerAuth.des3_encrypt(
+			msg=static_console_data_sha1_digest[0:16],
+			key=XSM3_ROOT_KEY_0x23,
+			iv=bytes(8),
+		)
+		logger.debug(f"console_key0={console_key0.hex(':')}")
+
+		console_key1 = Xbox360ControllerAuth.des3_encrypt(
+			msg=static_console_data_sha1_digest[4:20],
+			key=XSM3_ROOT_KEY_0x24,
+			iv=bytes(8),
+		)
+		logger.debug(f"console_key1={console_key1.hex(':')}")
+
+		return (console_key0, console_key1)
+
 
 
 
@@ -356,9 +387,6 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		#logger.debug(f"DES3_KEY_0x1D={DES3_KEY_0x1D.hex(':')}")
 		#logger.debug(f"DES3_KEY_0x1E={DES3_KEY_0x1E.hex(':')}")
 		self._console_id = None
-		self._xsm3_kv_2des_key_1 = None
-		self._xsm3_kv_2des_key_2 = None
-		self.challenge_num = None
 
 
 
@@ -511,10 +539,6 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			self: Self,
 			setup: bytes,
 	) -> bytes:
-		## This is always the first packet of the authentication 
-		## process, so reset the challenge counter.
-		self.challenge_num = 0
-
 		header = bytes([
 			0x49,	## ?Magic constant?
 			0x4b,
@@ -541,7 +565,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			self: Self,
 			setup: bytes,
 			data: bytes,
-	) -> None:
+	) -> bytes:
 		""" Decrypt challenge data received from host.
 
 		The Xbox 360 will challenge us, based on encrypted 
@@ -625,6 +649,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		logger.debug(f"self.static_console_data={self.static_console_data.hex(':')}")
 
 		self.is_ready = True
+		return bytes(0)
 
 
 
@@ -657,7 +682,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 		logger.debug("Encrypting data from host, to prove we have root key 35 (XSM3_ROOT_KEY_0x23).")
 		self._proof_0x23 = Xbox360ControllerAuth.des3_encrypt(
-			msg=self._random_console_data,
+			msg=self.random_console_data,
 			key=self.console_encryption_keys[0],
 			iv=bytes(8),
 		)
@@ -733,7 +758,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			setup: bytes,
 			data: bytes,
 
-	) -> None:
+	) -> bytes:
 		""" Decrypt challenge data received from host.
 
 		The Xbox 360 will challenge us, based on encrypted 
@@ -805,14 +830,20 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		## Decrypt the encrypted data.
 		cipher = Cryptodome.Cipher.DES3.new(
 			#key=DES3_KEY_0x1D,
-			key=self._random_controller_data,
+			key=self.random_controller_data,
 			mode=Cryptodome.Cipher.DES3.MODE_CBC,
 			iv=bytes(8),
 		)
-		self._decrypted_host_data = cipher.decrypt(encrypted_data)
+		self._decrypted_host_data = Xbox360ControllerAuth.des3_decrypt(
+			msg=encrypted_data,
+			#key=DES3_KEY_0x1D,
+			key=self.random_controller_data,
+			iv=bytes(8),
+		)
 		logger.debug(f"_decrypted_host_data={self._decrypted_host_data.hex(':')}")
 
 		self.is_ready = True
+		return bytes(0)
 
 
 
@@ -831,7 +862,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 		acr = self.ACR(
 			key=self._decrypted_host_data,
-			input=self._static_controller_data,
+			input=self.static_controller_data,
 		)
 		logger.debug(f"acr={acr.hex(':')}")
 		response_payload__before_encrypting = acr
@@ -870,6 +901,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 
+	@staticmethod
 	def MAC(data: bytes, key: bytes, iv: bytes) -> bytes:
 		logger.debug(f"MAC key={key.hex(':')}")
 		logger.debug(f"MAC iv={iv.hex(':')}")
@@ -904,6 +936,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 
+	@staticmethod
 	def checksum(data: bytes) -> int:
 		logger.debug(f"Calculating checksum over {data.hex(':')}.")
 		cksum = 0
@@ -912,6 +945,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		logger.debug(f"Checksum over {data.hex(':')} is {cksum:#04x}.")
 		return cksum
 
+	@staticmethod
 	def des3_decrypt(msg: bytes, key: bytes, iv: bytes) -> bytes:
 		cipher = Cryptodome.Cipher.DES3.new(
 			key=key,
@@ -920,6 +954,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		)
 		return cipher.decrypt(msg)
 
+	@staticmethod
 	def des3_encrypt(msg: bytes, key: bytes, iv: bytes) -> bytes:
 		cipher = Cryptodome.Cipher.DES3.new(
 			key=key,
@@ -927,25 +962,6 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			iv=iv,
 		)
 		return cipher.encrypt(msg)
-
-	def compute_console_keys(self: Self, console_id: bytes) -> None:
-		console_id_hash = Cryptodome.Hash.SHA1.new()
-		console_id_hash.update(console_id)
-		console_id_hash = console_id_hash.digest()
-		logger.debug(f"console_id_hash={console_id_hash.hex(':')}")
-
-		self._xsm3_kv_2des_key_1 = Xbox360ControllerAuth.des3_encrypt(
-			msg=console_id_hash[0:0x10],
-			key=XSM3_ROOT_KEY_0x23,
-			iv=bytes(8)
-		)
-		logger.debug(f"self._xsm3_kv_2des_key_1={self._xsm3_kv_2des_key_1.hex(':')}")
-
-		self._xsm3_kv_2des_key_2 = Xbox360ControllerAuth.des3_encrypt(
-			msg=console_id_hash[4:4+0x10],
-			key=XSM3_ROOT_KEY_0x24,
-		)
-		logger.debug(f"self._xsm3_kv_2des_key_2={self._xsm3_kv_2des_key_2.hex(':')}")
 
 	def ACR(self: Self, input: bytes, key: bytes) -> bytes:
 		logger.debug("ACR called.")
@@ -1005,6 +1021,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 class XeCrypt:
+	@staticmethod
 	def ParveEcb(key: bytes, inp: bytes) -> bytes:
 		assert len(key) == 8
 		assert len(inp) == 8
@@ -1061,6 +1078,7 @@ class XeCrypt:
 
 
 
+	@staticmethod
 	def ParveCbcMac(msg: bytes, key: bytes, iv: bytes) -> bytes:
 		result = iv
 		for i in range(len(msg) // 8):
@@ -1075,6 +1093,7 @@ class XeCrypt:
 
 
 
+	@staticmethod
 	def ChainAndSumMac(cd: bytes, ab: bytes, data: bytes) -> bytes:
 		out0 = 0
 		out1 = 0
