@@ -156,7 +156,13 @@ genuine_controller =\
     'UsbdSecXSM3GetIdentificationProtocolData':\
     {
         'packet': bytes.fromhex("c1 81 17 5b 03 01 1d 00"),
-        'response': bytes.fromhex("49 4b 00 00 17 4c 04 37   08 04 45 9c 29 02 03 20   00 00 80 02 5e 04 8e 02   03 00 01 01 f5"),
+        'response': bytes.fromhex((
+            "49 4b 00 00 17"		## Header. 0x17 == 23
+            "4c 04 37 08 04 45 9c 29"	## Payload[0:8]
+            "02 03 20 00 00 80 02 5e"	## Payload[8:16
+            "04 8e 02 03 00 01 01"	## Payload[16:23]
+            "f5"			## Checksum.
+        )),
     },
 
 
@@ -166,7 +172,15 @@ genuine_controller =\
     ##
     'UsbdSecXSM3SetChallengeProtocolData':
     {
-        'packet': bytes.fromhex("41 82 03 00 03 01 22 00   09 40 00 00 1c 77 6f 34   2b 4c 16 6e c6 c4 04 22   0f f5 95 5b 28 7d a6 f6   2a 3a 2b d8 32 ee 1d 69   1e 73"),
+        'packet': bytes.fromhex((
+            "41 82 03 00 03 01 22 00"	## Setup data.
+            "09 40 00 00 1c"		## Header. 0x1c == 28
+            "77 6f 34 2b 4c 16 6e c6"	## Payload[0:8]
+            "c4 04 22 0f f5 95 5b 28"	## Payload[8:16]
+            "7d a6 f6 2a 3a 2b d8 32"	## Payload[16:24]
+            "ee 1d 69 1e"		## Payload[24:28]
+            "73"			## Checksum.
+        )),
         'response': bytes(0),
     },
 
@@ -252,7 +266,7 @@ genuine_controller =\
 
 
 use_toypad = False
-use_toypad = True
+#use_toypad = True
 if use_toypad:
 	device = lego_dimenions_toypad
 else:
