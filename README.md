@@ -113,10 +113,10 @@ Annotated details of several devices:
 | Name                    | Header           | Serial (12 bytes)                     | ??      | Category node | Vendor ID | Product ID | ????          | Checksum | Source
 |-------------------------|------------------|---------------------------------------|---------|---------------|-----------|------------|---------------|----------|-------
 | Xbox 360 controller     | `49 4b 00 00 17` | `4c 04 37 08 04 45 9c 29 02 03 20 00` | `00 80` | `02`          | `5e 04`   | `8e 02`    | `03 00 01 01` | `f5`     | Our own wired controller
-| Xbox 360 controller:    | `49 4B 00 00 17` | `04 e1 11 54 15 ed 88 55 21 01 33 00` | `00 80` | `02`          | `5e 04`   | `8e 02`    | `03 00 01 01` | `c1`     | https://oct0xor.github.io/2017/05/03/xsm3/
-| Xbox 360 controller:    | `49 4B 00 00 17` | `84 3d 35 33 16 d6 33 28 23 03 20 00` | `00 80` | `82`          | `ad 1b`   | `01 fa`    | `03 00 01 01` | `28`     | https://brandonw.net/360bridge/Xbox360WiredController.xlsx
+| Xbox 360 controller     | `49 4b 00 00 17` | `04 e1 11 54 15 ed 88 55 21 01 33 00` | `00 80` | `02`          | `5e 04`   | `8e 02`    | `03 00 01 01` | `c1`     | https://oct0xor.github.io/2017/05/03/xsm3/
+| Xbox 360 controller     | `49 4b 00 00 17` | `84 3d 35 33 16 d6 33 28 23 03 20 00` | `00 80` | `82`          | `ad 1b`   | `01 fa`    | `03 00 01 01` | `28`     | https://brandonw.net/360bridge/Xbox360WiredController.xlsx
 | LEGO Dimensions toypad  | `49 4b 00 00 17` | `74 ff 25 53 0e 11 85 25 38 03 20 00` | `00 80` | `82`          | `c6 24`   | `00 50`    | `03 00 01 01` | `ea`     | Our own toypad
-
+| LEGO Dimensions toypad  | `49 4b 00 00 17` | `00 c9 18 25 05 11 85 25 38 03 20 00` | `00 80` | `82`          | `c6 24`   | `00 50`    | `03 00 01 01` | `e8`     | Our own toypad
 
 
 
