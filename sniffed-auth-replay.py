@@ -26,7 +26,7 @@ enable_module_logging('xbox360controllerauth')
 console = xbox360controllerauth.Xbox360ConsoleAuth()
 controller = xbox360controllerauth.Xbox360ControllerAuth()
 
-lego_dimenions_toypad =\
+lego_dimenions_toypad1 =\
 {
     'static_console_data': bytes.fromhex("06 47 2b 2b 09 80 81 82"),
     'random_console_data': None,
@@ -144,6 +144,128 @@ lego_dimenions_toypad =\
     },
 
 }
+
+
+
+lego_dimenions_toypad2 =\
+{
+    'static_console_data': bytes.fromhex("06 47 2b 2b 09 80 81 82"),
+    'random_console_data': None,
+
+    'static_controller_data': None,
+    'random_controller_data': None,
+
+    'UsbdSecXSM3GetIdentificationProtocolData':
+    {
+        'packet': bytes.fromhex("c1 81 17 5b 03 01 1d 00"),
+        'response': bytes.fromhex((
+            "49 4b 00 00 17"		## Header. 0x17 == 23
+            "00 c9 18 25 05 11 85 25"	## Payload[0:8]
+            "38 03 20 00 00 80 82 c6"	## Payload[8:16]
+            "24 00 50 03 00 01 01"	## Payload[16:23]
+            "e8"
+        )),
+    },
+
+
+
+    ##
+    ## Challenge 1: Set the challenge.
+    ##
+    'UsbdSecXSM3SetChallengeProtocolData':
+    {
+        'packet': bytes.fromhex((
+            "41 82 03 00 03 01 22 00"	## Setup data.
+            "09 40 00 00 1c"		## Header. 0x1c == 28
+            "60 17 b2 86 be 30 77 c8"	## Payload[0:8]
+            "a7 91 4c ee 13 63 c0 32"	## Payload[8:16]
+            "66 42 b0 fb 75 b9 24 70"	## Payload[16:24]
+            "9e 2e 70 a3"		## Payload[24:28]
+            "f0"			## Checksum.
+        )),
+        'response': bytes(0),
+    },
+
+    ##
+    ## Challenge 1: Obtain the challenge answer.
+    ##
+    'UsbdSecXSM3GetResponseVerifyProtocolData1':
+    {
+        'packet': bytes.fromhex("c1 83 28 5c 03 01 2e 00"),
+        'response': bytes.fromhex((
+            "49 4c 00 00 28"		## Header. 0x28 == 40
+            "95 e1 52 0e fd fd 48 bd"	## Payload[0:8]
+            "78 a4 ad 7c 22 d4 c3 c0"	## Payload[8:16]
+            "d2 15 a2 fb d1 8c b3 68"	## Payload[16:24]
+            "d1 c2 a1 ea 0d 65 e6 b3"	## Payload[24:32]
+            "f1 de 20 64 f5 1d ec dc"	## Payload[32:40]
+            "eb"			## Checksum.
+        )),
+    },
+
+
+
+    ##
+    ## Challenge 2: Set the challenge.
+    ##
+    'UsbdSecXSM3SetVerifyProtocolData2':
+    {
+        'packet': bytes.fromhex((
+            "41 87 03 00 03 01 16 00"	## Setup data.
+            "09 41 00 00 10"		## Header. 0x10 == 16
+            "a9 26 24 95 75 c8 c2 a1"	## Payload[0:8]
+            "6e ab 57 f3 5c 18 a7 a2"	## Payload[8:16]
+            "c0"			## Checksum.
+        )),
+        'response': bytes(0),
+    },
+
+    ##
+    ## Challenge 2: Obtain the challenge answer.
+    ##
+    'UsbdSecXSM3GetResponseVerifyProtocolData2':
+    {
+        'packet': bytes.fromhex("c1 83 10 5c 03 01 16 00"),
+        'response': bytes.fromhex((
+            "49 4c 00 00 10"		## Header. 0x10 == 16
+            "a6 eb 72 0e 71 12 50 83"	## Payload[0:8]
+            "ff 7d b8 5d 09 c5 3f f2"	## Payload[8:16]
+            "e7"			## Checksum.
+        )),
+    },
+
+
+
+    ##
+    ## Challenge 3: Set the challenge.
+    ##
+    'UsbdSecXSM3SetVerifyProtocolData3':
+    {
+        'packet': bytes.fromhex((
+            "41 87 03 00 03 01 16 00"	## Setup data.
+            "09 41 00 00 10"		## Header. 0x10 == 16
+            "ec d5 3a b8 7d 12 e1 e7"	## Payload[0:8]
+            "ec ad 7e 01 d6 88 e9 1d"	## Payload[8:16]
+            "46"			## Checksum.
+        )),
+    },
+
+    ##
+    ## Challenge 3: Obtain the challenge answer.
+    ##
+    'UsbdSecXSM3GetResponseVerifyProtocolData3':
+    {
+        'packet': bytes.fromhex("c1 83 10 5c 03 01 16 00"),
+        'response': bytes.fromhex((
+            "49 4c 00 00 10"		## Header. 0x10 == 16
+            "e2 12 a8 64 4f 47 d6 5c"	## Payload[0:8]
+            "76 78 47 59 32 3b c0 2a"	## Payload[8:16]
+            "4d"			## Checksum.
+        )),
+    },
+}
+
+
 
 genuine_controller =\
 {
@@ -268,7 +390,7 @@ genuine_controller =\
 use_toypad = False
 #use_toypad = True
 if use_toypad:
-	device = lego_dimenions_toypad
+	device = lego_dimenions_toypad1
 else:
 	device = genuine_controller
 
