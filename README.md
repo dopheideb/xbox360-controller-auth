@@ -194,8 +194,9 @@ Setup Data
 ```
 
 The device may respond with:
-1. ``01 00``, meaning: I am not ready.
-2. ``02 00``, meaning: I am ready.
+1. `00 00`, meaning unknown, but seems to be an error condition.
+2. `01 00`, meaning: I am not ready.
+3. `02 00`, meaning: I am ready.
 
 
 
