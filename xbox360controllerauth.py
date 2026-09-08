@@ -55,6 +55,23 @@ class Xbox360Authentication:
 
 		self._xsm3_kv_2des_key: tuple[bytes, bytes]|None = None
 
+	@staticmethod
+	def des3_decrypt(msg: bytes, key: bytes, iv: bytes) -> bytes:
+		cipher = Cryptodome.Cipher.DES3.new(
+			key=key,
+			mode=Cryptodome.Cipher.DES3.MODE_CBC,
+			iv=iv,
+		)
+		return cipher.decrypt(msg)
+
+	@staticmethod
+	def des3_encrypt(msg: bytes, key: bytes, iv: bytes) -> bytes:
+		cipher = Cryptodome.Cipher.DES3.new(
+			key=key,
+			mode=Cryptodome.Cipher.DES3.MODE_CBC,
+			iv=iv,
+		)
+		return cipher.encrypt(msg)
 
 	@property
 	def static_console_data(self: Self) -> bytes:
@@ -169,14 +186,14 @@ class Xbox360Authentication:
 		## 16 bytes are used for the first key, last 16 bytes 
 		## are used for the second key. Hence, the messages that 
 		## will be encrypted, have 12 bytes in common.
-		console_key0 = Xbox360ControllerAuth.des3_encrypt(
+		console_key0 = Xbox360Authentication.des3_encrypt(
 			msg=static_console_data_sha1_digest[0:16],
 			key=XSM3_ROOT_KEY_0x23,
 			iv=bytes(8),
 		)
 		logger.debug(f"console_key0={console_key0.hex(':')}")
 
-		console_key1 = Xbox360ControllerAuth.des3_encrypt(
+		console_key1 = Xbox360Authentication.des3_encrypt(
 			msg=static_console_data_sha1_digest[4:20],
 			key=XSM3_ROOT_KEY_0x24,
 			iv=bytes(8),
@@ -235,12 +252,11 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 		)
 
 		## Encrypt the payload.
-		cipher = Cryptodome.Cipher.DES3.new(
+		payload_encrypted = Xbox360Authentication.des3_encrypt(
+			msg=payload_unencrypted,
 			key=DES3_KEY_0x1D,
-			mode=Cryptodome.Cipher.DES3.MODE_CBC,
 			iv=bytes(8),		## !Zero IV!
 		)
-		payload_encrypted = cipher.encrypt(payload_unencrypted)
 		logger.debug(f"payload_encrypted={payload_encrypted.hex(':')}")
 
 		## Only the last 4 bytes of the computed MAC are used.
@@ -344,7 +360,7 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 		logger.debug(f"acr={acr.hex(':')}")
 		logger.debug(f"encrypted_message={encrypted_message.hex(':')}")
 
-		controller_key = Xbox360ControllerAuth.des3_encrypt(
+		controller_key = Xbox360Authentication.des3_encrypt(
 			msg=self.random_console_data,
 			key=self.console_encryption_keys[0],
 			iv=bytes(8),
@@ -352,7 +368,7 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 		logger.debug(f"controller_key={controller_key.hex(':')}")
 
 		logger.debug("Decrypting the encrypted message.")
-		decrypted_message = Xbox360ControllerAuth.des3_decrypt(
+		decrypted_message = Xbox360Authentication.des3_decrypt(
 			msg=encrypted_message,
 			key=controller_key,
 			iv=bytes(8),
@@ -634,12 +650,11 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		assert provided_mac == computed_mac
 
 		## Decrypt the encrypted data.
-		cipher = Cryptodome.Cipher.DES3.new(
+		self._decrypted_host_data = Xbox360Authentication.des3_decrypt(
+			msg=encrypted_data,
 			key=DES3_KEY_0x1D,
-			mode=Cryptodome.Cipher.DES3.MODE_CBC,
 			iv=bytes(8),		## !Zero IV!
 		)
-		self._decrypted_host_data = cipher.decrypt(encrypted_data)
 		logger.debug(f"_decrypted_host_data={self._decrypted_host_data.hex(':')}")
 
 		self.random_console_data = self._decrypted_host_data[0:0x10]
@@ -681,7 +696,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		logger.debug(f"self._verify_salt={self._verify_salt.hex(':')}")
 
 		logger.debug("Encrypting data from host, to prove we have root key 35 (XSM3_ROOT_KEY_0x23).")
-		self._proof_0x23 = Xbox360ControllerAuth.des3_encrypt(
+		self._proof_0x23 = Xbox360Authentication.des3_encrypt(
 			msg=self.random_console_data,
 			key=self.console_encryption_keys[0],
 			iv=bytes(8),
@@ -689,7 +704,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		logger.debug(f"self._proof_0x23={self._proof_0x23.hex(':')}")
 
 		logger.debug("Encrypting data from host, to prove we have root key 36 (XSM3_ROOT_KEY_0x24).")
-		self._proof_0x24 = Xbox360ControllerAuth.des3_encrypt(
+		self._proof_0x24 = Xbox360Authentication.des3_encrypt(
 			msg=random_host_data__swapped,
 			key=self.console_encryption_keys[1],
 			iv=bytes(8),
@@ -715,7 +730,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 
 
 		logger.debug(f"Encrypting this payload with the 0x23 proof.")
-		response_payload__after_encrypting = Xbox360ControllerAuth.des3_encrypt(
+		response_payload__after_encrypting = Xbox360Authentication.des3_encrypt(
 			msg=response_payload__before_encrypting,
 			key=self._proof_0x23,
 			iv=bytes(8),
@@ -828,13 +843,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		assert provided_mac == computed_mac
 
 		## Decrypt the encrypted data.
-		cipher = Cryptodome.Cipher.DES3.new(
-			#key=DES3_KEY_0x1D,
-			key=self.random_controller_data,
-			mode=Cryptodome.Cipher.DES3.MODE_CBC,
-			iv=bytes(8),
-		)
-		self._decrypted_host_data = Xbox360ControllerAuth.des3_decrypt(
+		self._decrypted_host_data = Xbox360Authentication.des3_decrypt(
 			msg=encrypted_data,
 			#key=DES3_KEY_0x1D,
 			key=self.random_controller_data,
@@ -869,7 +878,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		logger.debug(f"response_payload__before_encrypting={response_payload__before_encrypting.hex(':')}")
 
 		logger.debug(f"Encrypting this payload with the 0x23 proof.")
-		response_payload__after_encrypting = Xbox360ControllerAuth.des3_encrypt(
+		response_payload__after_encrypting = Xbox360Authentication.des3_encrypt(
 			msg=response_payload__before_encrypting,
 			key=self._proof_0x23,
 			iv=bytes(8),
@@ -926,13 +935,13 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		)
 		logger.debug(f"last_encrypted_block_with_msb_flip={last_encrypted_block_with_msb_flip.hex(':')}")
 
-		des3_cipher = Cryptodome.Cipher.DES3.new(
+		mac = Xbox360Authentication.des3_encrypt(
+			msg=last_encrypted_block_with_msb_flip,
 			key=key,
-			mode=Cryptodome.Cipher.DES.MODE_ECB,
+			iv=bytes(8),
 		)
-		output = des3_cipher.encrypt(last_encrypted_block_with_msb_flip)
-		logger.debug(f"output={output.hex(':')}")
-		return output
+		logger.debug(f"mac={mac.hex(':')}")
+		return mac
 
 
 
@@ -944,24 +953,6 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 			cksum ^= byte
 		logger.debug(f"Checksum over {data.hex(':')} is {cksum:#04x}.")
 		return cksum
-
-	@staticmethod
-	def des3_decrypt(msg: bytes, key: bytes, iv: bytes) -> bytes:
-		cipher = Cryptodome.Cipher.DES3.new(
-			key=key,
-			mode=Cryptodome.Cipher.DES3.MODE_CBC,
-			iv=iv,
-		)
-		return cipher.decrypt(msg)
-
-	@staticmethod
-	def des3_encrypt(msg: bytes, key: bytes, iv: bytes) -> bytes:
-		cipher = Cryptodome.Cipher.DES3.new(
-			key=key,
-			mode=Cryptodome.Cipher.DES3.MODE_CBC,
-			iv=iv,
-		)
-		return cipher.encrypt(msg)
 
 	def ACR(self: Self, input: bytes, key: bytes) -> bytes:
 		logger.debug("ACR called.")
