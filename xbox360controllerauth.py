@@ -54,10 +54,37 @@ class Xbox360Authentication:
 		self._static_controller_data: bytes|None = None
 		self._random_controller_data: bytes|None = None
 
-		self._xsm3_kv_2des_key: tuple[bytes, bytes]|None = None
+		self._challenge_data: bytes|None = None
 		self._challenge_response_sha1: bytes|None = None
+
+		self._xsm3_kv_2des_key: tuple[bytes, bytes]|None = None
 		self._verify_iv: bytes|None = None
 		self._derived_category_key: tuple[bytes,bytes]|None = None
+
+
+
+	@property
+	def challenge_data(self: Self) -> bytes:
+		""" Get the challenge data.
+
+		During UsbdSecXSM3SetVerifyProtocolData2, the host sends 
+		8 bytes of random data, to challenge the device.
+		"""
+		if self._challenge_data is None:
+			raise RuntimeError("challenge_data has not been initialized.")
+		return self._challenge_data
+
+	@challenge_data.setter
+	def challenge_data(self: Self, data: bytes) -> bytes:
+		""" Set the challenge data.
+
+		During UsbdSecXSM3SetVerifyProtocolData2, the host sends 
+		8 bytes of random data, to challenge the device.
+		"""
+		required_len = 8
+		if len(data) != required_len:
+			raise ValueError(f"The challenge data must be 8 bytes long, not {len(data)}.")
+		self._challenge_data = data
 
 
 
@@ -87,8 +114,8 @@ class Xbox360Authentication:
 	@derived_category_key.setter
 	def derived_category_key(self: Self, keypair: tuple[bytes, bytes]) -> None:
 		self._derived_category_key = keypair
-		logger.debug(f"self._derived_category_key[0]={self._derived_category_key[0]}")
-		logger.debug(f"self._derived_category_key[1]={self._derived_category_key[1]}")
+		logger.debug(f"self._derived_category_key[0]={self._derived_category_key[0].hex(':')}")
+		logger.debug(f"self._derived_category_key[1]={self._derived_category_key[1].hex(':')}")
 
 
 
@@ -175,6 +202,18 @@ class Xbox360Authentication:
 
 		logger.debug(f"Setting random_console_data to {data.hex(':')}.")
 		self._random_console_data = data
+
+		derived_category_key0 = Xbox360Authentication.des3_encrypt(
+			msg=self.random_console_data,
+			key=self.console_encryption_keys[0],
+		)
+		derived_category_key1 = Xbox360Authentication.des3_encrypt(
+			msg=self.random_console_data[8:] + self.random_console_data[0:8],
+			key=self.console_encryption_keys[1],
+		)
+		self.derived_category_key = (derived_category_key0, derived_category_key1)
+
+
 
 
 
@@ -267,6 +306,17 @@ class Xbox360Authentication:
 		sha1.update(static_console_data)
 		static_console_data_sha1_digest = sha1.digest()
 		logger.debug(f"static_console_data_sha1_digest={static_console_data_sha1_digest.hex(':')}")
+		## Security note: the static console data is send during 
+		## UsbdSecXSM3SetChallengeProtocolData. The data is 
+		## always encrypted with the 0x1D key, and, since that 
+		## key is publicly available, the static console data 
+		## can always be sniffed/determines from the 
+		## UsbdSecXSM3SetChallengeProtocolData packet.
+		## 
+		## But this also implies that the SHA1 of the static 
+		## console data can always be determined. This weakens 
+		## the overal security of the key derivation process a 
+		## lot, since it basically 1 of the 2 steps.
 
 		## Note: a SHA1 digest is 160 bit, i.e. 20 bytes. First 
 		## 16 bytes are used for the first key, last 16 bytes 
@@ -518,7 +568,6 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 			0x00,
 			0x10,		## Payload length.
 		])
-		self.challenge_data = random.randbytes(8)
 		encrypted_challenge_data = Xbox360Authentication.des3_encrypt(
 			msg=self.challenge_data,
 			key=self.random_controller_data,
@@ -592,17 +641,18 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 		)
 
 	def parse_UsbdSecXSM3GetResponseVerifyProtocolData_reply(self: Self, reply: bytes) -> None:
+		payload_length = 0x28
 		header = bytes([
 			0x49,
 			0x4c,
 			0x00,
 			0x00,
-			0x28,
+			payload_length,
 		])
 		assert reply[0:5] == header
 
 		payload = reply[5:-1]
-		assert len(payload) == 0x28, f"The payload must be 0x28 bytes long, not {len(payload)}."
+		assert len(payload) == payload_length, f"The payload must be {payload_length} bytes long, not {len(payload)}."
 
 		provided_checksum = reply[-1]
 		computed_checksum = Xbox360ControllerAuth.checksum(
@@ -615,12 +665,14 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 
 		## The payload consists of 2 parts. Split into those 
 		## parts.
-		encrypted_message = payload[0x00:0x20]
-		provided_acr = payload[0x20:0x28]
+		encrypted_message = payload[0:-8]
+		provided_acr = payload[-8:]
 		logger.debug(f"encrypted_message={encrypted_message.hex(':')}")
 		logger.debug(f"provided_acr={provided_acr.hex(':')}")
+		assert len(encrypted_message) == 32
 		## We can check the ACR once we have calculated the 
-		## derived category keys.
+		## derived category keys. I.e. we can't check the ACR 
+		## right now.
 
 		controller_key = Xbox360Authentication.des3_encrypt(
 			msg=self.random_console_data,
@@ -665,16 +717,6 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 			self.random_console_data[12:12+4]
 		)
 
-		derived_category_key0 = Xbox360Authentication.des3_encrypt(
-			msg=self.random_console_data,
-			key=self.console_encryption_keys[0],
-		)
-		derived_category_key1 = Xbox360Authentication.des3_encrypt(
-			msg=self.random_console_data[8:] + self.random_console_data[0:8],
-			key=self.console_encryption_keys[1],
-		)
-		self.derived_category_key = (derived_category_key0, derived_category_key1)
-
 		## Check the ACR.
 		mac = Xbox360ControllerAuth.MAC(
 			key=self.derived_category_key[1],
@@ -714,14 +756,18 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 		assert provided_checksum == computed_checksum,\
 			f"Checksum mismatch. Computed checksum (0x{computed_checksum:02x}) does not match packet provided checksum (0x{provided_checksum:02x})."
 
-		## Split the payload.
-		response_payload__after_encrypting = payload[0:8]
-		provided_mac = payload[8:16]
+		## The payload consists of 2 parts. Split into those 
+		## parts.
+		encrypted_message = payload[0:-8]
+		provided_mac = payload[-8:]
+		logger.debug(f"encrypted_message={encrypted_message.hex(':')}")
+		logger.debug(f"provided_mac={provided_mac.hex(':')}")
+		assert len(encrypted_message) == 8
 
 		## Check the MAC.
 		computed_mac = Xbox360ControllerAuth.MAC(
 			key=self.derived_category_key[1],
-			data=response_payload__after_encrypting,
+			data=encrypted_message,
 			iv=self.increase_verify_iv(),
 		)
 		logger.debug(f"provided_mac={provided_mac.hex(':')}")
@@ -730,7 +776,7 @@ class Xbox360ConsoleAuth(Xbox360Authentication):
 
 		## Decrypt the ACR.
 		response_payload__before_encrypting = Xbox360Authentication.des3_decrypt(
-			msg=response_payload__after_encrypting,
+			msg=encrypted_message,
 			key=self.derived_category_key[0],
 		)
 		provided_acr = response_payload__before_encrypting
@@ -750,7 +796,6 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		self.is_ready = False
 		#logger.debug(f"DES3_KEY_0x1D={DES3_KEY_0x1D.hex(':')}")
 		#logger.debug(f"DES3_KEY_0x1E={DES3_KEY_0x1E.hex(':')}")
-		self._console_id = None
 
 
 
@@ -999,17 +1044,21 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		assert provided_mac == computed_mac
 
 		## Decrypt the encrypted data.
-		self._decrypted_host_data = Xbox360Authentication.des3_decrypt(
+		random_and_static_console_data = Xbox360Authentication.des3_decrypt(
 			msg=encrypted_data,
 			key=DES3_KEY_0x1D,
 		)
-		logger.debug(f"_decrypted_host_data={self._decrypted_host_data.hex(':')}")
+		logger.debug(f"random_and_static_console_data={random_and_static_console_data.hex(':')}")
 
-		self.random_console_data = self._decrypted_host_data[0:0x10]
-		logger.debug(f"self.random_console_data={self.random_console_data.hex(':')}")
-
-		self.static_console_data = self._decrypted_host_data[0x10:0x10 + 8]
+		## Set static data before random, because the key 
+		## derivation based on the random data, is also based on 
+		## the static data. The key derivation of the static 
+		## data does _not_ depend on the random data.
+		self.static_console_data = random_and_static_console_data[0x10:0x10 + 8]
 		logger.debug(f"self.static_console_data={self.static_console_data.hex(':')}")
+
+		self.random_console_data = random_and_static_console_data[0:0x10]
+		logger.debug(f"self.random_console_data={self.random_console_data.hex(':')}")
 
 		self.is_ready = True
 		return bytes(0)
@@ -1179,12 +1228,12 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		assert provided_mac == computed_mac
 
 		## Decrypt the encrypted data.
-		self._decrypted_host_data = Xbox360Authentication.des3_decrypt(
+		self.challenge_data = Xbox360Authentication.des3_decrypt(
 			msg=encrypted_data,
 			#key=DES3_KEY_0x1D,
 			key=self.random_controller_data,
 		)
-		logger.debug(f"_decrypted_host_data={self._decrypted_host_data.hex(':')}")
+		logger.debug(f"self.challenge_data={self.challenge_data.hex(':')}")
 
 		self.is_ready = True
 		return bytes(0)
@@ -1205,7 +1254,7 @@ class Xbox360ControllerAuth(Xbox360Authentication):
 		])
 
 		acr = self.ACR(
-			key=self._decrypted_host_data,
+			key=self.challenge_data,
 			input=self.static_controller_data,
 		)
 		logger.debug(f"acr={acr.hex(':')}")
