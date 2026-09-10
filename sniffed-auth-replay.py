@@ -484,6 +484,13 @@ logger.debug(f"expected_reply={expected_reply.hex(':')}")
 ## Compare results.
 assert computed_reply == expected_reply
 
+console.challenge_data = controller.challenge_data
+computed_packet = console.UsbdSecXSM3SetVerifyProtocolData2()
+expected_packet = device['UsbdSecXSM3SetVerifyProtocolData2']['packet']
+logger.debug(f"computed_packet={computed_packet.hex(':')}")
+logger.debug(f"expected_packet={expected_packet.hex(':')}")
+assert computed_packet == expected_packet
+
 
 
 packet = None
