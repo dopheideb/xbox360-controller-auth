@@ -289,6 +289,9 @@ class Xbox360ControllerAuth(xbox360.auth.base.AuthBase):
 
 
 	def UsbdSecXSM3GetResponseVerifyProtocolData(self: Self) -> bytes:
+		logger.debug(f"The unencrypted response payload consists of:")
+		logger.debug(f"  The random data from the controller: {self.random_controller_data.hex(':')}")
+		logger.debug(f"  The random data from the console:    {self.random_console_data.hex(':')}")
 		response_payload__before_encrypting = (
 			self.random_controller_data
 			+
@@ -318,16 +321,6 @@ class Xbox360ControllerAuth(xbox360.auth.base.AuthBase):
 			key=self.console_encryption_keys[1],
 		)
 		self.derived_category_key = (derived_category_key0, derived_category_key1)
-
-		logger.debug(f"The unencrypted response payload consists of:")
-		logger.debug(f"  The random data from the controller: {self.random_controller_data.hex(':')}")
-		logger.debug(f"  The random data from the console:    {self.random_console_data.hex(':')}")
-		response_payload__before_encrypting = (
-			self.random_controller_data
-			+
-			self.random_console_data
-		)
-		logger.debug(f"response_payload__before_encrypting={response_payload__before_encrypting.hex(':')}")
 
 		## We need the SHA1 hash, as 8 bytes will be used as 
 		## IV/salt in the next challenge.
