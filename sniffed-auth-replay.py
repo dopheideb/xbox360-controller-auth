@@ -28,8 +28,10 @@ controller = xbox360controllerauth.Xbox360ControllerAuth()
 
 lego_dimenions_toypad1 =\
 {
+    ## sha1sum("06 47 2b 2b 09 80 81 82") == 7b:f6:65:0a:8b:dd:9b:9e:8a:8e:54:98:34:36:65:3e:05:27:ff:7d
     'static_console_data': bytes.fromhex("06 47 2b 2b 09 80 81 82"),
     'random_console_data': None,
+    #'random_console_data': bytes.fromhex("48 30 7a 18 91 9b cf c0 aa 15 95 49 e6 eb 9d 7f"),
 
     'static_controller_data': None,
     'random_controller_data': None,
@@ -149,10 +151,11 @@ lego_dimenions_toypad1 =\
 
 lego_dimenions_toypad2 =\
 {
+    ## sha1sum("06 47 2b 2b 09 80 81 82") == 7b:f6:65:0a:8b:dd:9b:9e:8a:8e:54:98:34:36:65:3e:05:27:ff:7d
     'static_console_data': bytes.fromhex("06 47 2b 2b 09 80 81 82"),
-    'random_console_data': None,
+    'random_console_data': bytes.fromhex("c4 83 40 09 52 2b 61 a2 f7 64 d0 5e c1 f4 31 e8"),
 
-    'static_controller_data': None,
+    'static_controller_data': bytes.fromhex("00 c9 18 25 05 11 85 25 38 03 20 00 00 80 82 00 c6 24 00 50 03 01 00 01"),
     'random_controller_data': None,
 
     'UsbdSecXSM3GetIdentificationProtocolData':
@@ -269,6 +272,7 @@ lego_dimenions_toypad2 =\
 
 genuine_controller =\
 {
+    ## sha1sum("06 47 2b 2b 09 80 81 82") == 7b:f6:65:0a:8b:dd:9b:9e:8a:8e:54:98:34:36:65:3e:05:27:ff:7d
     'static_console_data': bytes.fromhex("06 47 2b 2b 09 80 81 82"),
     'random_console_data': bytes.fromhex("57 50 02 e6 ea 6f 1a 2d d4 45 21 89 fd 9c 87 db"),
 
