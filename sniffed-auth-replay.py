@@ -2,7 +2,8 @@
 
 import logging
 import time
-import xbox360controllerauth
+import xbox360.auth.host
+import xbox360.auth.device
 
 
 
@@ -19,12 +20,15 @@ def enable_module_logging(module_name, level=logging.DEBUG):
     module_logger.addHandler(handler)
     return module_logger
 logger = enable_module_logging(__name__)
-enable_module_logging('xbox360controllerauth')
+enable_module_logging('xbox360.auth.host')
+enable_module_logging('xbox360.auth.device')
+enable_module_logging('xbox360.auth.base')
+enable_module_logging('xbox360.auth.xecrypt')
 
 
 
-console = xbox360controllerauth.Xbox360ConsoleAuth()
-controller = xbox360controllerauth.Xbox360ControllerAuth()
+console = xbox360.auth.host.Xbox360ConsoleAuth()
+controller = xbox360.auth.device.Xbox360ControllerAuth()
 
 lego_dimenions_toypad1 =\
 {
