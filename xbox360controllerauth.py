@@ -302,9 +302,9 @@ class Xbox360Authentication:
 	) -> tuple[bytes, bytes]:
 		## SHA1 is used to transform the static console data 
 		## into 20 bytes of (sortof) random bytes.
-		sha1 = Cryptodome.Hash.SHA1.new()
-		sha1.update(static_console_data)
-		static_console_data_sha1_digest = sha1.digest()
+		static_console_data_sha1_digest = Xbox360Authentication.SHA1(
+			static_console_data
+		)
 		logger.debug(f"static_console_data_sha1_digest={static_console_data_sha1_digest.hex(':')}")
 		## Security note: the static console data is send during 
 		## UsbdSecXSM3SetChallengeProtocolData. The data is 
