@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
 
 import Cryptodome.Cipher.DES3
+import Cryptodome.Hash.SHA1
 from   typing import Final
-import xbox360.auth.base
+
+def SHA1(msg: bytes) -> bytes:
+	sha1 = Cryptodome.Hash.SHA1.new()
+	sha1.update(msg)
+	return sha1.digest()
+
+def des3_encrypt(msg: bytes, key: bytes) -> bytes:
+	cipher = Cryptodome.Cipher.DES3.new(
+	        key=key,
+	        mode=Cryptodome.Cipher.DES3.MODE_CBC,
+	        iv=bytes(8),
+	)
+	return cipher.encrypt(msg)
 
 XSM3_ROOT_KEY_0x23: Final[bytes] = bytes.fromhex("82 80 78 68 3a 52 3a 98   10 f4 0c 12 70 66 dc ba")
 
@@ -13,7 +26,7 @@ print(f"static_console_data={static_console_data.hex(':')}")
 ##
 ##     <<<'06 47 2b 2b 09 80 81 82' xxd -r -plain\
 ##     | sha1sum
-static_console_data_sha1_digest = xbox360.auth.base.SHA1(static_console_data)
+static_console_data_sha1_digest = SHA1(static_console_data)
 print(f"static_console_data_sha1_digest[0:16]={static_console_data_sha1_digest[0:16].hex(':')}")
 assert static_console_data_sha1_digest[0:16] == bytes.fromhex("7b f6 65 0a 8b dd 9b 9e   8a 8e 54 98 34 36 65 3e")
 
@@ -28,7 +41,7 @@ assert static_console_data_sha1_digest[0:16] == bytes.fromhex("7b f6 65 0a 8b dd
 ##    | openssl enc -des-ede-cbc -nopad\
 ##        -iv 0000000000000000\
 ##        -K '828078683a523a9810f40c127066dcba'
-console_key0 = xbox360.auth.base.des3_encrypt(
+console_key0 = des3_encrypt(
 	msg=static_console_data_sha1_digest[0:16],
 	key=XSM3_ROOT_KEY_0x23,
 )
@@ -53,7 +66,7 @@ assert console_key0 == bytes.fromhex("9a de ee 7b 92 14 d4 5d   67 52 80 f0 d2 5
 ##             | xxd -plain
 ##         )"
 random_console_data = bytes.fromhex("57 50 02 e6 ea 6f 1a 2d   d4 45 21 89 fd 9c 87 db")
-session_key0 = xbox360.auth.base.des3_encrypt(
+session_key0 = des3_encrypt(
 	msg=random_console_data,
 	key=console_key0,
 )
@@ -88,7 +101,7 @@ print(f"random_controller_data={random_controller_data.hex(':')}")
 ##                 )"\
 ##             | xxd -plain
 ##         )"
-response = xbox360.auth.base.des3_encrypt(
+response = des3_encrypt(
 	msg=random_controller_data + random_console_data,
 	key=session_key0,
 )
