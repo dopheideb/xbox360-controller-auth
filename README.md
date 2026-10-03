@@ -22,7 +22,7 @@ The authentication process in short:
 * The Xbox 360 requests identification data from the controller.
 * The controller answers with (static) identification data.
 * The Xbox 360 sends some static and some random data, encrypted.
-* The controller decrpyts the message and stores static+random data.
+* The controller decrypts the message and stores static+random data.
 * The Xbox 360 send a challenge to the controller.
 * The controller answers.
 * The Xbox 360 send another challenge to the controller.
@@ -33,7 +33,7 @@ Overview of which data is exchanged:
 |---------------------------------------------|--------------------------------------------|--------------------------------------------------|------------
 | `UsbdSecXSM3GetIdentificationProtocolData`  | n/a                                        | static controller data                           | Unencypted
 | `UsbdSecXSM3SetChallengeProtocolData`       | random console data<br>static console data | n/a                                              | The 0x1D key (3DES two-key)
-| `UsbdSecXSM3GetResponseVerifyProtocolData1` | n/a                                        | random controller<br>random console data         | Derived from the 0x23 key and static console data.
+| `UsbdSecXSM3GetResponseVerifyProtocolData1` | n/a                                        | random controller<br>random console data         | Derived from the 0x23 key, the static console data, and the random console data.
 | `UsbdSecXSM3SetVerifyProtocolData2`         | challenge data                             | n/a                                              | random controller data
 | `UsbdSecXSM3GetResponseVerifyProtocolData2` | n/a                                        | ACR of challenge data and static controller data | Derived from the 0x23 key and static console data.
 
