@@ -289,7 +289,7 @@ genuine_controller =\
         'response': bytes.fromhex((
             "49 4b 00 00 17"		## Header. 0x17 == 23
             "4c 04 37 08 04 45 9c 29"	## Payload[0:8]
-            "02 03 20 00 00 80 02 5e"	## Payload[8:16
+            "02 03 20 00 00 80 02 5e"	## Payload[8:16]
             "04 8e 02 03 00 01 01"	## Payload[16:23]
             "f5"			## Checksum.
         )),
@@ -395,13 +395,136 @@ genuine_controller =\
 
 
 
+## Source:
+## * Article: https://brandonw.net/360bridge/doc.php
+## * Dump: https://brandonw.net/360bridge/Xbox360WiredController.xlsx
+harmonix_gamepad =\
+{
+    ## sha1sum("04 f5 73 4d 49 80 81 82") == 00:23:00:c0:23:84:9d:cb:f6:20:a6:cc:26:6c:a2:d2:45:54:55:fd
+    'static_console_data': bytes.fromhex("04 f5 73 4d 49 80 81 82"),
+    'random_console_data': bytes.fromhex("49 ff f2 aa 3c 6c 77 5d c7 e5 77 18 c8 ad 40 f8"),
+
+    'static_controller_data': None,
+    'random_controller_data': None,
+
+    'UsbdSecXSM3GetIdentificationProtocolData':\
+    {
+        'packet': bytes.fromhex("c1 81 17 5b 03 01 1d 00"),
+        'response': bytes.fromhex((
+            "49 4b 00 00 17"		## Header. 0x17 == 23
+            "84 3d 35 33 16 d6 33 28"	## Payload[0:8]
+            "23 03 20 00 00 80 82 ad"	## Payload[8:16]
+            "1b 01 fa 03 00 01 01"	## Payload[16:23]
+            "28"			## Checksum.
+        )),
+    },
+
+
+
+    ##
+    ## Challenge 1: Set the challenge.
+    ##
+    'UsbdSecXSM3SetChallengeProtocolData':
+    {
+        'packet': bytes.fromhex((
+            "41 82 03 00 03 01 22 00"	## Setup data.
+            "09 40 00 00 1c"		## Header. 0x1c == 28
+            "C6 1E 2B 26 38 04 D3 73"	## Payload[0:8]
+            "3A 72 50 46 55 A9 3F 7E"	## Payload[8:16]
+            "D6 49 6D F7 88 F1 AF 09"	## Payload[16:24]
+            "EF FC FA 56"		## Payload[24:28]
+            "CF"			## Checksum.
+        )),
+        'response': bytes(0),
+    },
+
+    ##
+    ## Challenge 1: Obtain the challenge answer.
+    ##
+    'UsbdSecXSM3GetResponseVerifyProtocolData1':
+    {
+        'packet': bytes.fromhex("c1 83 28 5c 03 01 2e 00"),
+        'response': bytes.fromhex((
+            "49 4C 00 00 28 D3 4B 00"
+            "B5 0D 3A 06 56 82 44 78"
+            "F1 63 DB A1 28 5D F6 7B"
+            "05 1F 23 45 8E 34 7B A1"
+            "34 9E 16 BA E9 0B 12 8A"
+            "AD 23 54 14 D5 9F"
+        )),
+    },
+
+
+
+    ##
+    ## Challenge 2: Set the challenge.
+    ##
+    'UsbdSecXSM3SetVerifyProtocolData2':
+    {
+        'packet': bytes.fromhex((
+            "41 87 03 00 03 01 16 00"	## Setup data.
+            "09 41 00 00 10"		## Header. 0x10 == 16
+            "97 96 5A C0 9D 44 36 86"	## Payload[0:8].
+            "07 2C 0C 73 05 73 1C 77"	## Payload[8:16].
+            "BB"			## Checksum.
+        )),
+        'response': bytes(0),
+    },
+
+    ##
+    ## Challenge 2: Obtain the challenge answer.
+    ##
+    'UsbdSecXSM3GetResponseVerifyProtocolData2':
+    {
+        'packet': bytes.fromhex("c1 83 10 5c 03 01 16 00"),
+        'response': bytes.fromhex((
+            "49 4c 00 00 10"		## Header. 0x10 == 16
+            "84 9E 56 0A 61 55 A6 E6"	## Payload[0:8].
+            "AD BB 01 EE C6 31 A9 5E"	## Payload[8:16].
+            "CB"			## Checksum.
+        )),
+    },
+
+
+
+    ##
+    ## Challenge 3: Set the challenge.
+    ##
+    'UsbdSecXSM3SetVerifyProtocolData3':
+    {
+        'packet': bytes.fromhex((
+            "41 87 03 00 03 01 16 00"	## Setup data.
+            "09 41 00 00 10"		## Header. 0x10 == 16
+            "C9 EF 57 CC 23 A3 7F A6"	## Payload[0:8]
+            "36 BE DA 62 0C 0A CD F6"	## Payload[8:16]
+            "E9"			## Checksum.
+        )),
+        'response': bytes(0),
+    },
+
+    ##
+    ## Challenge 3: Obtain the challenge answer.
+    ##
+    'UsbdSecXSM3GetResponseVerifyProtocolData3':
+    {
+        'packet': bytes.fromhex("c1 83 10 5c 03 01 16 00"),
+        'response': bytes.fromhex((
+            "49 4c 00 00 10"		## Header. 0x10 == 16
+            "30 FE 01 13 B8 A2 48 FB"	## Payload[0:8].
+            "1A 92 49 5E 79 68 E8 30"	## Payload[8:16].
+            "23"			## Checksum.
+        )),
+    },
+}
+
+
 use_toypad = False
 #use_toypad = True
 if use_toypad:
 	device = lego_dimenions_toypad1
 else:
 	device = genuine_controller
-
+	#device = harmonix_gamepad
 
 
 ##
